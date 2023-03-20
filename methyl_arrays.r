@@ -1288,8 +1288,7 @@ saveWorkbook(wb = get(wb), overwrite = T, file = paste("Methylation analysis res
 # save(list = c("mSetRaw", "mSetSq", "mSetSqFlt", "rgSet", "detP", "detP.tibble"), file = paste("Methylation analysis preliminary data", suffix, "RData", sep = "."))
 rm(mSetRaw, mSetSq, mSetSqFlt, rgSet, detP, detP.tibble)
 
-if(!file.exists(file.path("GEO_submission", paste("Methylation_data", suffix, "soft", sep = ".")))) {
-  cat("Preparing methylation data for submission to the Gene Expression Omnibus database (the SOFT file along with the supplementary idat files will be saved in the directory: ",
+cat("Preparing methylation data for submission to the Gene Expression Omnibus database (the SOFT file along with the supplementary idat files will be saved in the directory: ",
       file.path(workspace, "GEO_submission"), "...\n", sep = "")
   library(wateRmelon)
   library(methylumi)
@@ -1334,7 +1333,6 @@ if(!file.exists(file.path("GEO_submission", paste("Methylation_data", suffix, "s
                                       methyLumiM.raw = epic.data.MethyLumiM,
                                       sampleInfo = GEOsampleInfo,
                                       fileName = file.path("GEO_submission", paste("Methylation_data", suffix, "soft", sep = ".")))
-}
 
 save.image <- function(file){save(list=grep(ls(all.names = TRUE, envir = .GlobalEnv), pattern = "^arguments$", value = T, invert = T), file = file)}
 
