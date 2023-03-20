@@ -1308,6 +1308,7 @@ if(!file.exists(file.path("GEO_submission", paste("Methylation_data", suffix, "s
   epic.data.norm <- normalizeMethyLumiSet(epic.data)
   epic.data.MethyLumiM <- as(epic.data, "MethyLumiM")
   epic.data.norm.MethyLumiM <- as(epic.data.norm, "MethyLumiM")
+  rm(epic.data, epic.data.norm)
   
   produceGEOSampleInfoTemplate(lumiNormalized = epic.data.norm.MethyLumiM)
   GEOsampleInfo <- fread("GEOsampleInfo.txt")
