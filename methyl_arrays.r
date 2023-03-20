@@ -1352,7 +1352,7 @@ save.image(paste("Methylation analysis results", suffix, "RData", sep = "."))
   }
   }
 
-if(!file.exists(paste("Methylation_data", suffix, "soft", sep = "."))) {
+if(!file.exists(file.path("GEO_submission", paste("Methylation_data", suffix, "soft", sep = ".")))) {
   library(wateRmelon)
   library(methylumi)
   all.idats <- list.files(unique(file.path(dataDirectory, targets$Slide)), pattern = ".*\\.idat$", full.names = T)
@@ -1362,11 +1362,11 @@ if(!file.exists(paste("Methylation_data", suffix, "soft", sep = "."))) {
   dataTable <- dataTable[dataTable %>% dplyr::select(all_of(c("Sentrix_ID", "Sentrix_Position"))) %>% unite(col = "United", sep = "_") %>% .[,"United"] %in% barcodes.list,]
   dataTable <- dataTable %>% unite(c("Sentrix_ID", "Sentrix_Position"), col = "barcodes", sep = "_")
   dataTable <- dataTable[order(dataTable$barcodes),]
-  dir.create("sel.idats.dir")
-  if(!all(file.copy(from = sel.idats, to = "sel.idats.dir", overwrite = T))) {stop("An error occurred while copying idat files to the sel.idats.dir")}
-  if(!all(dataTable$barcodes == unique(sub(list.files("sel.idats.dir/"), pattern = "_(Grn|Red)\\.idat$", replacement = "")))) {stop("Barcodes of idat files do not match those privided in the attached data frame.")}
+  dir.create("GEO_submission")
+  if(!all(file.copy(from = sel.idats, to = "GEO_submission", overwrite = T))) {stop("An error occurred while copying idat files to the GEO_submission directory.")}
+  if(!all(dataTable$barcodes == unique(sub(list.files("GEO_submission"), pattern = "_(Grn|Red)\\.idat$", replacement = "")))) {stop("Barcodes of idat files do not match those privided in the attached data frame.")}
 
-  epic.data <- readEPIC(idatPath = "sel.idats.dir", pdat = dataTable, force = T)
+  epic.data <- readEPIC(idatPath = "GEO_submission", pdat = dataTable, force = T)
   epic.data.norm <- normalizeMethyLumiSet(epic.data)
   epic.data.MethyLumiM <- as(epic.data, "MethyLumiM")
   epic.data.norm.MethyLumiM <- as(epic.data.norm, "MethyLumiM")
@@ -1381,17 +1381,20 @@ if(!file.exists(paste("Methylation_data", suffix, "soft", sep = "."))) {
   GEOsampleInfo$Sample_characteristics_ch1 <- paste("Group", dataTable$Sample_Group, sep = ": ")
   GEOsampleInfo$Sample_label_ch1 <- "Cy3, Cy5"
   GEOsampleInfo$Sample_description <- dataTable$Sample_Description
+  GEOsampleInfo$Sample_data_processing <- as.character(GEOsampleInfo$Sample_data_processing)
+  GEOsampleInfo$Sample_data_processing <- "The data were processed according to protocol published by Maksimovic, J. et al., 2016 (PMID: 27347385), using the R script developed by Szafron LM, available for download from https://github.com/lukszafron/methyl_arrays.r."
   GEOsampleInfo$Sample_platform_id <- "GPL21145"
   GEOsampleInfo$Sample_supplementary_file <- NULL
-  sel.idats.names <- list.files("sel.idats.dir/")
+  sel.idats.names <- list.files("GEO_submission")
   sel.idats.names <- sel.idats.names[foreach(ID = GEOsampleInfo$sampleID, .combine = c) %do% {which(grepl(sel.idats.names, pattern = ID))}]
   supplementary.data <- cbind(sel.idats.names[seq(1,length(sel.idats.names), 2)], sel.idats.names[seq(2,length(sel.idats.names), 2)])
   colnames(supplementary.data) <- c("Sample_supplementary_file", "Sample_supplementary_file")
   GEOsampleInfo <- cbind(GEOsampleInfo, supplementary.data)
   
-  
-  unlink("sel.idats.dir", recursive = T)
-  
+  produceMethylationGEOSubmissionFile(methyLumiM = epic.data.norm.MethyLumiM,
+                                      methyLumiM.raw = epic.data.MethyLumiM,
+                                      sampleInfo = GEOsampleInfo,
+                                      fileName = file.path("GEO_submission", paste("Methylation_data", suffix, "soft", sep = ".")))
 }
 
 
