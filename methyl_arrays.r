@@ -1353,6 +1353,8 @@ save.image(paste("Methylation analysis results", suffix, "RData", sep = "."))
   }
 
 if(!file.exists(file.path("GEO_submission", paste("Methylation_data", suffix, "soft", sep = ".")))) {
+  cat("Preparing methylation data for submission to the Gene Expression Omnibus database (the SOFT file along with the supplementary idat files will be saved in the directory: ",
+      file.path(workspace, "GEO_submission"), "...\n", sep = "")
   library(wateRmelon)
   library(methylumi)
   all.idats <- list.files(unique(file.path(dataDirectory, targets$Slide)), pattern = ".*\\.idat$", full.names = T)
@@ -1396,11 +1398,6 @@ if(!file.exists(file.path("GEO_submission", paste("Methylation_data", suffix, "s
                                       sampleInfo = GEOsampleInfo,
                                       fileName = file.path("GEO_submission", paste("Methylation_data", suffix, "soft", sep = ".")))
 }
-
-
-
-
-
 
 sessionInfo()
 proc.time()
