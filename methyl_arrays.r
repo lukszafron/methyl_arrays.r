@@ -1299,6 +1299,7 @@ cat("Preparing methylation data for submission to the Gene Expression Omnibus da
   dataTable <- dataTable[dataTable %>% dplyr::select(all_of(c("Sentrix_ID", "Sentrix_Position"))) %>% unite(col = "United", sep = "_") %>% .[,"United"] %in% barcodes.list,]
   dataTable <- dataTable %>% unite(c("Sentrix_ID", "Sentrix_Position"), col = "barcodes", sep = "_")
   dataTable <- dataTable[order(dataTable$barcodes),]
+  unlink("GEO_submission", recursive = T)
   dir.create("GEO_submission")
   if(!all(file.copy(from = sel.idats, to = "GEO_submission", overwrite = T))) {stop("An error occurred while copying idat files to the GEO_submission directory.")}
   if(!all(dataTable$barcodes == unique(sub(list.files("GEO_submission"), pattern = "_(Grn|Red)\\.idat$", replacement = "")))) {stop("Barcodes of idat files do not match those privided in the attached data frame.")}
