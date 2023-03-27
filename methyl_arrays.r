@@ -1305,8 +1305,8 @@ saveWorkbook(wb = get(wb), overwrite = T, file = paste("Methylation analysis res
 # save(list = c("mSetRaw", "mSetSq", "mSetSqFlt", "rgSet", "detP", "detP.tibble"), file = paste("Methylation analysis preliminary data", suffix, "RData", sep = "."))
 rm(mSetRaw, mSetSq, mSetSqFlt, rgSet, detP, detP.tibble)
 
-cat("Preparing methylation data for submission to the Gene Expression Omnibus database (the XLSX file along with the supplementary idat files will be saved in the directory: ",
-      file.path(workspace, "GEO_submission"), "...\n", sep = "")
+cat("Preparing methylation data for submission to the Gene Expression Omnibus database (the files containing tab-separated values (tsv) along with the supplementary idat files will be saved in the directory: ",
+      file.path(workspace, "GEO_submission)"), "...\n", sep = "")
   library(wateRmelon)
   library(methylumi)
   all.idats <- list.files(unique(file.path(dataDirectory, targets$Slide)), pattern = ".*\\.idat$", full.names = T)
@@ -1319,7 +1319,7 @@ cat("Preparing methylation data for submission to the Gene Expression Omnibus da
   unlink("GEO_submission", recursive = T)
   dir.create("GEO_submission")
   if(!all(file.copy(from = sel.idats, to = "GEO_submission", overwrite = T))) {stop("An error occurred while copying idat files to the GEO_submission directory.")}
-  if(!all(dataTable$barcodes == unique(sub(list.files("GEO_submission"), pattern = "_(Grn|Red)\\.idat$", replacement = "")))) {stop("Barcodes of idat files do not match those privided in the attached data frame.")}
+  if(!all(dataTable$barcodes == unique(sub(list.files("GEO_submission"), pattern = "_(Grn|Red)\\.idat$", replacement = "")))) {stop("Barcodes of idat files do not match those listed in the provided data table.")}
   
   epic.data <- readEPIC(idatPath = "GEO_submission", pdat = dataTable, force = T)
   epic.data.norm <- normalizeMethyLumiSet(epic.data)
@@ -1349,7 +1349,7 @@ cat("Preparing methylation data for submission to the Gene Expression Omnibus da
     add_column(., .before = 1, rownames(matrix.signal.intensities))
   colnames(matrix.signal.intensities)[1] <- "ID_REF"
   
-  GEO_template <- readWorkbook(xlsxFile = file.path(illuminaDataDir, "GEO_submission_Illumina_EPIC_template.xlsx"), rows = seq(16), colNames = F)
+  GEO_template <- readWorkbook(xlsxFile = file.path(illuminaDataDir, "GEO_submission_Illumina_EPIC_template.xlsx"), rows = seq(16), colNames = F, skipEmptyRows = F)
   GEO_template_samples <- readWorkbook(xlsxFile = file.path(illuminaDataDir, "GEO_submission_Illumina_EPIC_template.xlsx"), startRow = 17)
   GEO_samples <- setNames(as.data.frame(rep(data.table(rep(NA, nrow(dataTable))), ncol(GEO_template_samples))), colnames(GEO_template_samples))
   GEO_samples$Sample.name <- dataTable$barcodes
