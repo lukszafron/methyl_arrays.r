@@ -4,9 +4,8 @@ options(max.print = 10000)
 cat("Program path:", unlist(strsplit(grep(commandArgs(), pattern = "file=", value = T), split = "="))[2], "\n")
 
 arguments <- commandArgs(trailingOnly = T)
-# arguments <- c('/shares/Microarrays/OvCa', '/shares/Microarrays/OvCa/OvCa.microarrays.final.csv', '/workspace/lukasz/Microarrays', "TRUE", "60", "Sample_Name", "Sample_Group+Sample_Source", "/workspace/lukasz/Microarrays/OvCa.microarrays.final/microarrays.final.sig_CpGs.txt", "FALSE")
-# arguments <- c("/shares/Microarrays/Macice/", "/shares/Microarrays/Macice/Macice.csv", "/workspace/lukasz/Microarrays", "TRUE", "60", "Sample_Name", "Sample_Group", "NA", "FALSE")
-if(length(arguments) != 9) {cat(paste("The number of provided arguments is incorrect:", 
+# arguments <- c('/shares/Microarrays/OvCa', '/shares/Microarrays/OvCa/OvCa.microarrays.final.csv', '/workspace/lukasz/Microarrays', "TRUE", "60", "Sample_Name", "Sample_Source", "Sample_Gender", "Sample_Description", "Sample_Group+Sample_Source", "Sentrix_ID", "Sentrix_Position", "/workspace/lukasz/Microarrays/OvCa.microarrays.final/microarrays.final.sig_CpGs.txt")
+if(length(arguments) != 13) {cat(paste("The number of provided arguments is incorrect:", 
                                        length(arguments), "instead of 9.
                                        The arguments should be placed in the following order:
                                        1 - a directory where microarray data are stored,
@@ -15,11 +14,49 @@ if(length(arguments) != 9) {cat(paste("The number of provided arguments is incor
                                        4 - a boolean value (TRUE/FALSE) determining if the data binarization step should be performed,
                                        5 - a number of CPU threads to be used,
                                        6 - a variable in the aforementioned csv file containing sample names,
-                                       7 - independent factor variables in the aforementioned csv file to be used, separated with '+', starting with a grouping variable,
-                                       8 - a path to the optional txt file containing the list of CpG sites (one per a line) for which the methylation status visualization is to be performed (NA if none),
-                                       9 - a boolean value (TRUE/FALSE) indicating if the cohort of patients contains individuals of both sexes.\n"))
+                                       7 - a variable in the aforementioned csv file containing sample sources,
+                                       8 - a variable in the aforementioned csv file containing sample genders,
+                                       9 - a variable in the aforementioned csv file containing sample descriptions,
+                                      10 - independent factor variables in the aforementioned csv file to be used, separated with '+', starting with a grouping variable,
+                                      11 - a variable containing the Sentrix ID,
+                                      12 - a variable containing the Sentrix Position,
+                                      13 - a path to the optional txt file containing the list of CpG sites (one per a line) for which the methylation status visualization is to be performed (NA if none).\n"))
   stop("Incorrect number of arguments.")}
 arguments.backup <- arguments
+
+library(knitr)
+library(limma)
+library(minfi)
+library(RColorBrewer)
+library(missMethyl)
+library(Gviz)
+library(DMRcate)
+library(stringr)
+library(tidyverse)
+library(ggfortify)
+library(pheatmap)
+library(ggplot2)
+library(ggpmisc)
+library(pals)
+library(factoextra)
+library(foreach)
+library(doMC)
+library(openxlsx)
+library(pdftools)
+library(UpSetR)
+library(rtracklayer)
+library(AnnotationHub)
+library(GenomicFeatures)
+library(data.table)
+library(annotatr)
+library(plyr)
+library(dplyr)
+library(tibble)
+library(stringi)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
+library(IlluminaHumanMethylationEPICmanifest)
 
 read.args <- function() {
 dataDirectory <<- arguments[1]
@@ -29,20 +66,36 @@ illuminaDataDir <<- file.path(workspace, "Illumina_data")
 dataBinarization <<- as.logical(arguments[4])
 threads <<- as.numeric(arguments[5])
 snames <<- arguments[6]
-ind.factors <<- unlist(strsplit(arguments[7], split = "\\+"))
-CpGs.signature.file <<- arguments[8]
+sources <<- arguments[7]
+genders <<- arguments[8]
+descriptions <<- arguments[9]
+ind.factors <<- unlist(strsplit(arguments[10], split = "\\+"))
+sentrix.id <<- arguments[11]
+sentrix.position <<- arguments[12]
+CpGs.signature.file <<- arguments[13]
 
 if(CpGs.signature.file != "NA") {
 sel.CpGs <<- readLines(con = file(CpGs.signature.file))
 close(file(CpGs.signature.file))} else {
 sel.CpGs <<- "NA"
 }
-both.sexes <<- as.logical(arguments[9])
 }
 read.args()
+registerDoMC(threads)
 
 genome.ver <- "hg19" # Do not modify this value
 methyl.type <- "EPIC"
+
+dataTable <- fread(csvfile)
+
+both.sexes <- if(length(levels(factor(dataTable[[genders]]))) == 1) {
+  FALSE
+} else if(length(levels(factor(dataTable[[genders]]))) == 2) {
+  TRUE
+} else {
+    stop("The number of genders defined in the provided clinical data file is incorrect: ", length(levels(factor(dataTable[[genders]]))), ".")
+  }
+
 suffix <- paste("dataDir", basename(dataDirectory), "clinData", basename(csvfile), "dataBin", dataBinarization, "methyl.type", methyl.type, "genome", genome.ver, "both.sexes", both.sexes, sep = ".")
 
 workdir <- sub(basename(csvfile), pattern = "\\.[^\\.]*$", replacement = "")
@@ -62,47 +115,11 @@ if(dataBinarization) {
 dir.create(workspace, recursive = T)
 setwd(workspace)
 
-library(knitr)
-library(limma)
-library(minfi)
-library(RColorBrewer)
-library(missMethyl)
-library(Gviz)
-library(DMRcate)
-library(stringr)
-library(tidyverse)
-library(ggfortify)
-library(pheatmap)
-library(ggplot2)
-library(ggpmisc)
-library(pals)
-library(factoextra)
-library(foreach)
-library(doMC)
-registerDoMC(threads)
-library(openxlsx)
-library(pdftools)
-library(UpSetR)
-library(rtracklayer)
-library(AnnotationHub)
-library(GenomicFeatures)
-library(data.table)
-library(annotatr)
-library(plyr)
-library(dplyr)
-library(tibble)
-library(stringi)
-library(AnnotationDbi)
-library(org.Hs.eg.db)
-library(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
-library(IlluminaHumanMethylationEPICmanifest)
-
 if(!file.exists(paste("Methylation analysis results", suffix, "RData", sep = "."))) {
   
 annots <- c("hg19_basicgenes", "hg19_genes_intergenic", "hg19_genes_intronexonboundaries", "hg19_lncrna_gencode", "hg19_genes_firstexons", "hg19_genes_cds", "hg19_enhancers_fantom")
 annotations <- build_annotations(genome = genome.ver, annotations = annots)
 
-dataTable <- fread(csvfile)
 sink(paste("Analysis summary", suffix, "txt", sep = "."))
 cat("Total number of samples:", nrow(dataTable), "\n\n")
 print(with(dataTable, by(dataTable, INDICES = lapply(dataTable[,..ind.factors], as.vector), FUN = function(x) {l1 <-list(nrow(x), x[[snames]]); names(l1) <- c("Number of samples", "List of samples"); l1})))
@@ -172,7 +189,7 @@ if (!all(sampleNames(rgSet) == colnames(detP))) {stop("The sample names do not m
 
 sink(paste("Analysis summary", suffix, "txt", sep = "."), append = T)
 cat("\nSamples filtered out due to their poor quality:\n\n")
-print(dataTable[!dataTable[[snames]] %in% targets[[snames]],c(1,3,4)])
+print(dataTable[!dataTable[[snames]] %in% targets[[snames]],])
 sink()
 
 if(ncol(detP.centiles.df) > 16) {
@@ -221,7 +238,7 @@ filter.summary(nrow(mSetSqFlt), "'detP <0.05 for all the samples'")
 sink()
 
 if(both.sexes) {
-# # if your data includes males and females, remove probes on the sex chromosomes
+# # if your data include males and females, remove probes on the sex chromosomes
 keep <- !(featureNames(mSetSqFlt) %in% EPICanno$Name[EPICanno$chr %in% c("chrX","chrY")])
 table(keep)
 mSetSqFlt <- mSetSqFlt[keep,]
@@ -528,7 +545,7 @@ unique.genes <- sort(unique(unlist(strsplit(cpgData.annotated$Genes, split = ";"
 unique.genes <- grep(unique.genes, pattern = "(^|;)NA\\(", invert = T, value = T)
 
 # Create a design matrix
-design <- with(targets,model.matrix(eval(parse(text = paste0("~0+", arguments[7]))), data=targets))
+design <- with(targets,model.matrix(eval(parse(text = paste0("~0+", arguments[10]))), data=targets))
 # Get all combinations of sample groups
 group.combinations.mx <- combn(grep(colnames(design), pattern = ind.factors[1], value = T),2)
 group.combinations <- foreach(comb = seq(1,ncol(group.combinations.mx)), .combine = c) %do% {paste(group.combinations.mx[,comb], collapse = "-")}
@@ -1288,7 +1305,7 @@ saveWorkbook(wb = get(wb), overwrite = T, file = paste("Methylation analysis res
 # save(list = c("mSetRaw", "mSetSq", "mSetSqFlt", "rgSet", "detP", "detP.tibble"), file = paste("Methylation analysis preliminary data", suffix, "RData", sep = "."))
 rm(mSetRaw, mSetSq, mSetSqFlt, rgSet, detP, detP.tibble)
 
-cat("Preparing methylation data for submission to the Gene Expression Omnibus database (the SOFT file along with the supplementary idat files will be saved in the directory: ",
+cat("Preparing methylation data for submission to the Gene Expression Omnibus database (the XLSX file along with the supplementary idat files will be saved in the directory: ",
       file.path(workspace, "GEO_submission"), "...\n", sep = "")
   library(wateRmelon)
   library(methylumi)
@@ -1296,8 +1313,8 @@ cat("Preparing methylation data for submission to the Gene Expression Omnibus da
   idats.keep <- foreach(idat = all.idats, .combine = c) %do% {sjmisc::str_contains(idat, pattern = targets$Basename, logic = "OR")}
   sel.idats <- all.idats[idats.keep]
   barcodes.list <- unique(basename(sub(sel.idats, pattern = "_(Grn|Red)\\.idat$", replacement = "")))
-  dataTable <- dataTable[dataTable %>% dplyr::select(all_of(c("Sentrix_ID", "Sentrix_Position"))) %>% unite(col = "United", sep = "_") %>% .[,"United"] %in% barcodes.list,]
-  dataTable <- dataTable %>% unite(c("Sentrix_ID", "Sentrix_Position"), col = "barcodes", sep = "_")
+  dataTable <- dataTable[dataTable %>% dplyr::select(all_of(c(sentrix.id, sentrix.position))) %>% unite(col = "United", sep = "_") %>% .[,"United"] %in% barcodes.list,]
+  dataTable <- dataTable %>% unite(all_of(c(sentrix.id, sentrix.position)), col = "barcodes", sep = "_")
   dataTable <- dataTable[order(dataTable$barcodes),]
   unlink("GEO_submission", recursive = T)
   dir.create("GEO_submission")
@@ -1306,35 +1323,59 @@ cat("Preparing methylation data for submission to the Gene Expression Omnibus da
   
   epic.data <- readEPIC(idatPath = "GEO_submission", pdat = dataTable, force = T)
   epic.data.norm <- normalizeMethyLumiSet(epic.data)
-  epic.data.MethyLumiM <- as(epic.data, "MethyLumiM")
-  epic.data.norm.MethyLumiM <- as(epic.data.norm, "MethyLumiM")
-  rm(epic.data, epic.data.norm)
   
-  produceGEOSampleInfoTemplate(lumiNormalized = epic.data.norm.MethyLumiM)
-  GEOsampleInfo <- fread("GEOsampleInfo.txt")
-  unlink("GEOsampleInfo.txt")
-  stopifnot(dataTable[["barcodes"]] == GEOsampleInfo[["sampleID"]])
-  GEOsampleInfo$Sample_title <- dataTable$Sample_Name
-  GEOsampleInfo$Sample_source_name_ch1 <- dataTable$Sample_Source
-  GEOsampleInfo$Sample_organism_ch1 <- "Homo sapiens"
-  GEOsampleInfo$Sample_characteristics_ch1 <- paste("Group", dataTable$Sample_Group, sep = ": ")
-  GEOsampleInfo$Sample_label_ch1 <- "Cy3, Cy5"
-  GEOsampleInfo$Sample_description <- dataTable$Sample_Description
-  GEOsampleInfo$Sample_data_processing <- as.character(GEOsampleInfo$Sample_data_processing)
-  GEOsampleInfo$Sample_data_processing <- "The data were processed according to protocol published by Maksimovic, J. et al., 2016 (PMID: 27347385), using the R script developed by Szafron LM, available for download from https://github.com/lukszafron/methyl_arrays.r."
-  GEOsampleInfo$Sample_platform_id <- "GPL21145"
-  GEOsampleInfo$Sample_supplementary_file <- NULL
+  matrix.processed <- cbind(betas(epic.data.norm), pvals(epic.data))
+  col.order <- foreach(i = seq(ncol(epic.data)), .combine = c) %do% {c(i, i+ncol(epic.data))}
+  matrix.processed <- matrix.processed[,col.order]
+  colnames(matrix.processed)[seq(2, ncol(epic.data)*2, 2)] <- rep("Detection Pval", ncol(epic.data))
+  matrix.processed <- matrix.processed %>% as.tibble(.name_repair = "minimal") %>% 
+    add_column(., .before = 1, rownames(matrix.processed), .name_repair = "minimal")
+  colnames(matrix.processed)[1] <- "ID_REF"
+  
+  matrix.signal.intensities <- cbind(unmethylated(epic.data), methylated(epic.data), pvals(epic.data))
+  col.order <- foreach(i = seq(ncol(epic.data)), .combine = c) %do% {c(i, i+ncol(epic.data), i+ncol(epic.data)*2)}
+  matrix.signal.intensities <- matrix.signal.intensities[, col.order]
+  
+  col.names <- colnames(matrix.signal.intensities)[seq(1, ncol(epic.data)*3, 3)]
+  colnames(matrix.signal.intensities)[seq(1, ncol(epic.data)*3, 3)] <- paste(col.names, "Unmethylated Signal")
+  
+  col.names <- colnames(matrix.signal.intensities)[seq(2, ncol(epic.data)*3, 3)]
+  colnames(matrix.signal.intensities)[seq(2, ncol(epic.data)*3, 3)] <- paste(col.names, "Methylated Signal")
+  
+  col.names <- colnames(matrix.signal.intensities)[seq(3, ncol(epic.data)*3, 3)]
+  colnames(matrix.signal.intensities)[seq(3, ncol(epic.data)*3, 3)] <- paste(col.names, "Detection Pval")
+  
+  matrix.signal.intensities <- matrix.signal.intensities %>% as.tibble() %>% 
+    add_column(., .before = 1, rownames(matrix.signal.intensities))
+  colnames(matrix.signal.intensities)[1] <- "ID_REF"
+  
+  GEO_template <- readWorkbook(xlsxFile = file.path(illuminaDataDir, "GEO_submission_Illumina_EPIC_template.xlsx"), rows = seq(16), colNames = F)
+  GEO_template_samples <- readWorkbook(xlsxFile = file.path(illuminaDataDir, "GEO_submission_Illumina_EPIC_template.xlsx"), startRow = 17)
+  GEO_samples <- setNames(as.data.frame(rep(data.table(rep(NA, nrow(dataTable))), ncol(GEO_template_samples))), colnames(GEO_template_samples))
+  GEO_samples$Sample.name <- dataTable$barcodes
+  GEO_samples$title <- dataTable[[snames]]
+  GEO_samples$source.name <- dataTable[[sources]]
+  GEO_samples$organism <- "Homo sapiens"
   sel.idats.names <- list.files("GEO_submission")
-  sel.idats.names <- sel.idats.names[foreach(ID = GEOsampleInfo$sampleID, .combine = c) %do% {which(grepl(sel.idats.names, pattern = ID))}]
+  sel.idats.names <- sel.idats.names[foreach(ID = GEO_samples$Sample.name, .combine = c) %do% {which(grepl(sel.idats.names, pattern = ID))}]
   supplementary.data <- cbind(sel.idats.names[seq(1,length(sel.idats.names), 2)], sel.idats.names[seq(2,length(sel.idats.names), 2)])
-  colnames(supplementary.data) <- c("Sample_supplementary_file", "Sample_supplementary_file")
-  GEOsampleInfo <- cbind(GEOsampleInfo, supplementary.data)
+  GEO_samples$idat.file.1 <- supplementary.data[,1]
+  GEO_samples$idat.file.2 <- supplementary.data[,2]
+  GEO_samples$`characteristics:.gender` <- dataTable[[genders]]
+  ind.factors.wo.sources <- ind.factors[!ind.factors %in% sources]
+  GEO_samples <- add_column(GEO_samples, .after = "characteristics:.gender",
+                            setNames(dataTable[ind.factors.wo.sources], nm = paste("characteristics:", ind.factors.wo.sources)))
+  GEO_samples$molecule <- "genomic DNA"
+  GEO_samples$label <- "Cy5 and Cy3"
+  GEO_samples$description <- dataTable[[descriptions]]
+  GEO_samples$platform <- "GPL21145"
+  colnames(GEO_samples) <- gsub(colnames(GEO_samples), pattern = "\\.", replacement = " ")
   
-  produceMethylationGEOSubmissionFile(methyLumiM = epic.data.norm.MethyLumiM,
-                                      methyLumiM.raw = epic.data.MethyLumiM,
-                                      sampleInfo = GEOsampleInfo,
-                                      fileName = file.path("GEO_submission", paste("Methylation_data", suffix, "soft", sep = ".")))
-
+  write.table(x = GEO_template, sep = "\t", na = "", file = file.path("GEO_submission", paste("Metadata", suffix, "tsv", sep = ".")), append = F, row.names = F, col.names = F)
+  suppressWarnings(write.table(x = GEO_samples, sep = "\t", na = "", file = file.path("GEO_submission", paste("Metadata", suffix, "tsv", sep = ".")), append = T, row.names = F, col.names = T))
+  write.table(x = matrix.processed, sep = "\t", na = "", file = file.path("GEO_submission", paste("Matrix_processed", suffix, "tsv", sep = ".")), append = F, row.names = F, col.names = T)
+  write.table(x = matrix.signal.intensities, sep = "\t", na = "", file = file.path("GEO_submission", paste("Matrix_signal_intensities", suffix, "tsv", sep = ".")), append = F, row.names = F, col.names = T)
+  
 save.image <- function(file){save(list=grep(ls(all.names = TRUE, envir = .GlobalEnv), pattern = "^arguments$", value = T, invert = T), file = file)}
 
 save.image(paste("Methylation analysis results", suffix, "RData", sep = "."))
