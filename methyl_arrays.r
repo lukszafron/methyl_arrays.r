@@ -286,7 +286,7 @@ Beta.values.bin[Beta.values.bin < 0.5] <- 0
 
 #Draw density plots of Beta-values
 cat("Drawing density plots of beta values...\n")
-# visualise what the data looks like before and after normalisation and filtering
+# Visualize what the data looks like before and after normalization and filtering
 pdf(paste("Density_plots", suffix, "pdf", sep = "."), height = 10, width = 7)
 par(mfrow=c(3,1))
 densityPlot(getBeta(mSetRaw), sampGroups=targets[[ind.factors[1]]],
