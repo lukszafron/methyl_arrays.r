@@ -165,7 +165,7 @@ quality.plot <- ggplot(colMeans.detP,aes(x=reorder(rownames(colMeans.detP), as.n
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
   geom_errorbar(aes(y = colMeans, ymin=colMeans-CI95, ymax=colMeans+CI95)) + 
   geom_hline(yintercept=0.05, linetype="dashed", color = "red") + 
-  xlab("Samples") + ylab("Detection p-values") + 
+  xlab("Samples") + ylab("Detection p-value") + 
   labs(title = "Microarray quality assessment", color = ind.factors[1], subtitle = "(Means of detection p-values with 95% confidence intervals)") + 
   theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5))
 print(quality.plot)
@@ -205,7 +205,7 @@ quality.plot2.tmp <- ggplot(get(j)) +
   scale_y_log10() + scale_y_continuous(breaks = c(0.01, 0.05, 0.1, 0.5, 1)) +
   scale_x_continuous(breaks = seq(0,100,5)) +
   geom_hline(yintercept=0.05, linetype="dashed", color = "red") +
-  xlab("Percentile of methylation sites") + ylab("Detection p-values") +
+  xlab("Percentile of methylation sites") + ylab("Detection p-value") +
   labs(title = "Microarray quality assessment 2", color = "Samples") +
   theme(plot.title = element_text(hjust = 0.5))
   print(quality.plot2.tmp)}
