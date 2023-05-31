@@ -166,7 +166,7 @@ quality.plot <- ggplot(colMeans.detP,aes(x=reorder(rownames(colMeans.detP), as.n
   geom_errorbar(aes(y = colMeans, ymin=colMeans-CI95, ymax=colMeans+CI95)) + 
   geom_hline(yintercept=0.05, linetype="dashed", color = "red") + 
   xlab("Samples") + ylab("Detection p-values") + 
-  labs(title = "Microarray quality assessment", color = ind.factors[1], subtitle = "(Means of the detection p-values with 95% confidence intervals)") + 
+  labs(title = "Microarray quality assessment", color = ind.factors[1], subtitle = "(Means of detection p-values with 95% confidence intervals)") + 
   theme(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5))
 print(quality.plot)
 
