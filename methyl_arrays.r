@@ -1400,9 +1400,27 @@ save.image(paste("Methylation analysis results", suffix, "RData", sep = "."))
     if(l2ratios == "log2ratios") {Beta.vals <- Beta.values} else {
       Beta.vals <- Beta.values.bin}
       
+    sel.CpGs.existing <- sel.CpGs[sel.CpGs %in% rownames(Beta.vals)]
+    Beta.vals.sel <- Beta.vals[sel.CpGs.existing,]
+    if(!all(colnames(Beta.vals.sel) == targets$ID)) {stop("The colnames and target IDs do not match.")}
+    df.sel <- as.data.frame(cbind(t(Beta.vals.sel), targets[ind.factors[1]]))
+    df.sel.means <- with(df.sel, aggregate(x = df.sel %>% dplyr::select(-ind.factors[1]), by = list(get(ind.factors[1])), FUN = mean))
+    colnames(df.sel.means)[colnames(df.sel.means) == "Group.1"] <- ind.factors[1]
+    
     pdf.name <- paste(basename(CpGs.signature.file), "listed_CpG_sites", datatype, suffix, "pdf", sep = ".")
     if(ncol(Beta.vals) < 63) {width <- 7} else {width <- ceiling(ncol(Beta.vals)/9)}
     pdf(title = pdf.name, file = pdf.name, width = width)
+    
+    CpGs.comp.plot <- ggplot(data = df.sel.means) +
+      sapply(sel.CpGs.existing, function(i) {geom_line(aes_string(x = ind.factors[1], y = i, color = 'i', group = 'i'))}) +
+      sapply(sel.CpGs.existing, function(i) {geom_point(aes_string(x = ind.factors[1], y = i, color = 'i', group = 'i'))}) +
+      ylab("Mean beta value") +
+      labs(title = "Comparison of mean beta values for selected CpGs", color = "CpG") +
+      theme(plot.title = element_text(hjust = 0.5)) +
+      if(length(sel.CpGs.existing) <= 25) {
+        scale_color_manual(values=as.vector(cols25()))
+      }
+    print(CpGs.comp.plot)
     
     for(CpG in sel.CpGs) {
       labels <- mapply(function(DMPs, name, CpG) {df.tmp <- DMPs[DMPs$Name == CpG,c("logFC", "adj.P.Val")]
