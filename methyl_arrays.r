@@ -4,9 +4,9 @@ options(max.print = 10000)
 cat("Program path:", unlist(strsplit(grep(commandArgs(), pattern = "file=", value = T), split = "="))[2], "\n")
 
 arguments <- commandArgs(trailingOnly = T)
-# arguments <- c('/shares/Microarrays/OvCa', '/shares/Microarrays/OvCa/OvCa.microarrays.final.csv', '/workspace/lukasz/Microarrays', "TRUE", "60", "Sample_Name", "Sample_Source", "Sample_Gender", "Sample_Description", "Sample_Group+Sample_Source", "Sentrix_ID", "Sentrix_Position", "/workspace/lukasz/Microarrays/OvCa.microarrays.final/microarrays.final.sig_CpGs.txt")
+arguments <- c('/shares/Microarrays/Macice', '/shares/Microarrays/Macice/Macice.extended.csv', '/workspace/lukasz/Microarrays', "TRUE", "60", "Sample_Name", "Sample_Source", "Sample_Gender", "Sample_Label", "Sample_Group", "Sentrix_ID", "Sentrix_Position", "NA")
 if(length(arguments) != 13) {cat(paste("The number of provided arguments is incorrect:", 
-                                       length(arguments), "instead of 9.
+                                       length(arguments), "instead of 13.
                                        The arguments should be placed in the following order:
                                        1 - a directory where microarray data are stored,
                                        2 - a csv file with microarray data description,
@@ -17,11 +17,12 @@ if(length(arguments) != 13) {cat(paste("The number of provided arguments is inco
                                        7 - a variable in the aforementioned csv file containing sample sources,
                                        8 - a variable in the aforementioned csv file containing sample genders,
                                        9 - a variable in the aforementioned csv file containing sample descriptions,
-                                      10 - independent factor variables in the aforementioned csv file to be used, separated with '+', starting with a grouping variable,
-                                      11 - a variable containing the Sentrix ID,
-                                      12 - a variable containing the Sentrix Position,
+                                      10 - independent factor variables in the aforementioned csv file to be used, separated with '+', starting with a main categorical variable,
+                                      11 - a variable containing the Sentrix IDs,
+                                      12 - a variable containing the Sentrix Positions,
                                       13 - a path to the optional txt file containing the list of CpG sites (one per a line) for which the methylation status visualization is to be performed (NA if none).\n"))
   stop("Incorrect number of arguments.")}
+arguments
 arguments.backup <- arguments
 
 library(knitr)
@@ -795,6 +796,7 @@ all.res.df <- all.res.df[all.res.df$gene.name %in% names(kwallis.mins), , drop =
 final.order <- foreach(name = names(kwallis.mins), .combine = c) %dopar% {which(all.res.df$gene.name %in% name)}
 all.res.df <- all.res.df[final.order,]
 all.res.df <- all.res.df %>% tibble::add_column(index = seq(1, nrow(all.res.df)), .before = 1)
+all.res.df <- subset(all.res.df, subset = !gene.region %in% c("(m)", "(p)"))
 addWorksheet(wb = get(wb), sheetName = "CpGs.GeneRegions.analysis")
 writeData(x = all.res.df, wb = get(wb), sheet = "CpGs.GeneRegions.analysis", rowNames = F)
 
