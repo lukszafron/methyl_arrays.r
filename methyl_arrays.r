@@ -156,7 +156,8 @@ colMeans.detP$SE <- colMeans.detP$SD/sqrt(nrow(detP))
 t = qt((1-0.05)/2 + .5, nrow(detP)-1) # Value of the Student's t distribution for alpha = 0.05, tends to be 1.96 if the sample size is big enough.
 colMeans.detP$CI95 <- t*colMeans.detP$SE
 
-qcReport(rgSet, sampNames=targets$ID, sampGroups=targets[[ind.factors[1]]], pdf=paste("qcReport", suffix, "pdf", sep = "."))
+tryCatch(expr = {qcReport(rgSet, sampNames=targets$ID, sampGroups=targets[[ind.factors[1]]], pdf=paste("qcReport", suffix, "pdf", sep = "."))},
+error = {function(e) {plot.new() + plot.window(xlim=c(-5,5), ylim=c(-5,5)); title(main=paste("An error occurred.")); dev.off()}})
 
 if(nrow(colMeans.detP) < 56) {df.width <- 7} else {df.width <- nrow(colMeans.detP)/8}
 pdf(paste("Microarray_quality_control", suffix,"pdf", sep = "."), width = df.width)
