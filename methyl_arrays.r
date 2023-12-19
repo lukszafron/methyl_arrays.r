@@ -4,7 +4,7 @@ options(max.print = 10000)
 cat("Program path:", unlist(strsplit(grep(commandArgs(), pattern = "file=", value = T), split = "="))[2], "\n")
 
 arguments <- commandArgs(trailingOnly = T)
-arguments <- c('/shares/Microarrays/Macice', '/shares/Microarrays/Macice/Macice.extended.csv', '/workspace/lukasz/Microarrays', "TRUE", "60", "Sample_Name", "Sample_Source", "Sample_Gender", "Sample_Label", "Sample_Group", "Sentrix_ID", "Sentrix_Position", "NA")
+# arguments <- c('/shares/Microarrays/Macice', '/shares/Microarrays/Macice/Macice.extended.csv', '/workspace/lukasz/Microarrays', "TRUE", "60", "Sample_Name", "Sample_Source", "Sample_Gender", "Sample_Label", "Sample_Group", "Sentrix_ID", "Sentrix_Position", "NA")
 if(length(arguments) != 13) {cat(paste("The number of provided arguments is incorrect:", 
                                        length(arguments), "instead of 13.
                                        The arguments should be placed in the following order:
@@ -156,9 +156,6 @@ colMeans.detP$SE <- colMeans.detP$SD/sqrt(nrow(detP))
 t = qt((1-0.05)/2 + .5, nrow(detP)-1) # Value of the Student's t distribution for alpha = 0.05, tends to be 1.96 if the sample size is big enough.
 colMeans.detP$CI95 <- t*colMeans.detP$SE
 
-tryCatch(expr = {qcReport(rgSet, sampNames=targets$ID, sampGroups=targets[[ind.factors[1]]], pdf=paste("qcReport", suffix, "pdf", sep = "."))},
-error = {function(e) {plot.new() + plot.window(xlim=c(-5,5), ylim=c(-5,5)); title(main=paste("An error occurred.")); dev.off()}})
-
 if(nrow(colMeans.detP) < 56) {df.width <- 7} else {df.width <- nrow(colMeans.detP)/8}
 pdf(paste("Microarray_quality_control", suffix,"pdf", sep = "."), width = df.width)
 quality.plot <- ggplot(colMeans.detP,aes(x=reorder(rownames(colMeans.detP), as.numeric(targets[[ind.factors[1]]])), y=colMeans, color=targets[[ind.factors[1]]])) + 
@@ -185,9 +182,9 @@ if(!all(foreach(i = rgSet[[snames]], j = colnames(keep), .combine = c) %do% {gre
 keep <- as.vector(keep)
 rgSet <- rgSet[, keep] # The poor-quality samples are being filtered out.
 targets <- targets[keep, ] # Remove filtered out samples.
-detP <- detP[, keep] # Remove poor quality samples from detection p-value table
-if (!all(sampleNames(rgSet) == targets[["ID"]])) {stop("The sample names do not mach after filtering.")}
-if (!all(sampleNames(rgSet) == colnames(detP))) {stop("The sample names do not mach after filtering.")}
+detP <- detP[, keep] # Remove poor quality samples from detection p-value table.
+if (!all(sampleNames(rgSet) == targets[["ID"]])) {stop("The sample names do not match after filtering.")}
+if (!all(sampleNames(rgSet) == colnames(detP))) {stop("The sample names do not match after filtering.")}
 
 sink(paste("Analysis summary", suffix, "txt", sep = "."), append = T)
 cat("\nSamples filtered out due to their poor quality:\n\n")
@@ -214,6 +211,22 @@ quality.plot2.tmp <- ggplot(get(j)) +
 dev.off()
 
 rm(list = grep(ls(), pattern = "^qdf.[0-9]+", value = TRUE))
+
+successful.hybridizations <- rowSums(colMeans.detP) > 0
+
+rgSet <- rgSet[, successful.hybridizations] # The samples with unsuccessful hybridizatations are being filtered out.
+targets <- targets[successful.hybridizations, ] # Remove filtered out samples.
+detP <- detP[, successful.hybridizations] # Remove filtered out samples from detection p-value table.
+if (!all(sampleNames(rgSet) == targets[["ID"]])) {stop("The sample names do not match after filtering.")}
+if (!all(sampleNames(rgSet) == colnames(detP))) {stop("The sample names do not match after filtering.")}
+
+sink(paste("Analysis summary", suffix, "txt", sep = "."), append = T)
+cat("\nSamples filtered out due to unsuccessful hybridization:\n\n")
+print(dataTable[!dataTable[[snames]] %in% targets[[snames]],])
+sink()
+
+tryCatch(expr = {qcReport(rgSet, sampNames=targets$ID, sampGroups=targets[[ind.factors[1]]], pdf=paste("qcReport", suffix, "pdf", sep = "."))},
+error = {function(e) {plot.new() + plot.window(xlim=c(-5,5), ylim=c(-5,5)); title(main=paste("An error occurred.")); dev.off()}})
 
 cat("Performing the data normalization step...\n")
 mSetSq <- preprocessFunnorm(rgSet = rgSet) # Data normalization step. As a results, we get the GenomicRatioSet object, with M-values, being the log2 values of Meth/Unmeth fluorescence after normalization. To retrieve this ratios, we use the getM() function.
