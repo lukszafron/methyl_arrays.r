@@ -4,14 +4,14 @@ options(max.print = 10000)
 cat("Program path:", unlist(strsplit(grep(commandArgs(), pattern = "file=", value = T), split = "="))[2], "\n")
 
 arguments <- commandArgs(trailingOnly = T)
-# arguments <- c('/shares/Microarrays/Macice', '/shares/Microarrays/Macice/Macice.extended.csv', '/workspace/lukasz/Microarrays', "TRUE", "60", "Sample_Name", "Sample_Source", "Sample_Gender", "Sample_Label", "Sample_Group", "Sentrix_ID", "Sentrix_Position", "NA")
+# arguments <- c("/shares/Microarrays/OvCa", "/shares/Microarrays/OvCa/OvCa.microarrays.new.full.csv", "/workspace/lukasz/Microarrays", "FALSE", "60", "Sample_Name", "Sample_Source", "Sample_Gender", "Sample_Description", "Sample_Group+Sample_Source", "Sentrix_ID", "Sentrix_Position", "/workspace/lukasz/Microarrays/OvCa.microarrays.new.full/Selected_CpGs.txt")
 if(length(arguments) != 13) {cat(paste("The number of provided arguments is incorrect:", 
                                        length(arguments), "instead of 13.
                                        The arguments should be placed in the following order:
                                        1 - a directory where microarray data are stored,
                                        2 - a csv file with microarray data description,
                                        3 - a directory where the analysis results should be saved,
-                                       4 - a boolean value (TRUE/FALSE) determining if the data binarization step should be performed,
+                                       4 - a Boolean value (TRUE/FALSE) determining if the data binarization step should be performed,
                                        5 - a number of CPU threads to be used,
                                        6 - a variable in the aforementioned csv file containing sample names,
                                        7 - a variable in the aforementioned csv file containing sample sources,
@@ -88,6 +88,7 @@ genome.ver <- "hg19" # Do not modify this value
 methyl.type <- "EPIC"
 
 dataTable <- fread(csvfile)
+dataTable <- dataTable %>% dplyr::mutate(across(.cols = ind.factors, .fns = make.names))
 
 both.sexes <- if(length(levels(factor(dataTable[[genders]]))) == 1) {
   FALSE
@@ -127,6 +128,8 @@ print(with(dataTable, by(dataTable, INDICES = lapply(dataTable[,..ind.factors], 
 sink()
 
 targets <- read.metharray.sheet(dataDirectory, pattern = basename(csvfile)) # Define targets
+targets <- targets %>% dplyr::mutate(across(.cols = ind.factors, .fns = make.names))
+
 ah <- AnnotationHub(ask = F)
 setAnnotationHubOption("max_downloads", threads)
 epiFiles <- query(ah, "EpigenomeRoadMap")
@@ -809,8 +812,9 @@ kwallis.mins <- kwallis.mins[kwallis.mins <0.05]
 all.res.df <- all.res.df[all.res.df$gene.name %in% names(kwallis.mins), , drop = F]
 final.order <- foreach(name = names(kwallis.mins), .combine = c) %dopar% {which(all.res.df$gene.name %in% name)}
 all.res.df <- all.res.df[final.order,]
-all.res.df <- all.res.df %>% tibble::add_column(index = seq(1, nrow(all.res.df)), .before = 1)
 all.res.df <- subset(all.res.df, subset = !gene.region %in% c("(m)", "(p)"))
+all.res.df <- all.res.df %>% tibble::add_column(index = seq(1, nrow(all.res.df)), .before = 1)
+
 addWorksheet(wb = get(wb), sheetName = "CpGs.GeneRegions.analysis")
 writeData(x = all.res.df, wb = get(wb), sheet = "CpGs.GeneRegions.analysis", rowNames = F)
 
@@ -847,7 +851,7 @@ invisible(foreach(gene.no = seq(length(genes.list))) %dopar% {
       stat_summary(geom = "point", fun = mean, fill = "yellow", shape = 24) +
       annotate(geom = "table", x = (length(level.names)+1)/2, y = max(Aver.Betas.df$Average.Betas) * 1.3, label = list(all.res.df.sub.sub), table.theme = ttheme_gtminimal, vjust = 1, hjust = 0.5) +
       scale_fill_manual(values = as.character(cols25())) +
-      labs(title = paste("Comparison of beta values distribution, gene:", gene, ", region:", region),
+      labs(title = paste0("Comparison of beta values distribution, gene: ", gene, ", region: ", region),
            x = ind.factors[1], y = paste("Average beta values")) +
       theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
     print(box.plot)
@@ -1417,7 +1421,7 @@ save.image(paste("Methylation analysis results", suffix, "RData", sep = "."))
       Beta.vals <- Beta.values.bin}
       
     sel.CpGs.existing <- sel.CpGs[sel.CpGs %in% rownames(Beta.vals)]
-    Beta.vals.sel <- Beta.vals[sel.CpGs.existing,]
+    Beta.vals.sel <- Beta.vals[sel.CpGs.existing,, drop = F]
     if(!all(colnames(Beta.vals.sel) == targets$ID)) {stop("The colnames and target IDs do not match.")}
     df.sel <- as.data.frame(cbind(t(Beta.vals.sel), targets[ind.factors[1]]))
     df.sel.means <- with(df.sel, aggregate(x = df.sel %>% dplyr::select(-ind.factors[1]), by = list(get(ind.factors[1])), FUN = mean))
