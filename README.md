@@ -1,6 +1,7 @@
 # $${\color{lightgreen}Methyl\\_arrays.r}$$
 
 The arguments should be placed in the following order:
+
                                        1 - a directory where microarray data are stored,
                                        2 - a csv file with microarray data description,
                                        3 - a directory where the analysis results should be saved,
