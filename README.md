@@ -1,5 +1,7 @@
 # $${\color{lightgreen}Methyl\\_arrays.r}$$
 
+The R script for bioinformatic and statistical analyses of data obtained from Infinium MethylationEPIC microarray.
+
 The arguments should be placed in the following order:
 
                                        1 - a directory where microarray data are stored,
