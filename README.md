@@ -1,4 +1,4 @@
-# $${\color{lightgreen}Methyl\\_arrays.r}$$
+# $${\color{green}Methyl\\_arrays.r}$$
 
 The R script for bioinformatic and statistical analyses of data obtained from Infinium MethylationEPIC microarray.
 
